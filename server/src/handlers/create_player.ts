@@ -1,13 +1,37 @@
 
+import { db } from '../db';
+import { playersTable } from '../db/schema';
 import { type CreatePlayerInput, type Player } from '../schema';
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 
-export async function createPlayer(input: CreatePlayerInput): Promise<Player> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new player account with a unique username.
-    // Should validate username uniqueness and generate a unique player ID.
-    return Promise.resolve({
-        id: 'player_' + Math.random().toString(36).substr(2, 9), // Placeholder ID
-        username: input.username,
-        created_at: new Date()
-    } as Player);
-}
+export const createPlayer = async (input: CreatePlayerInput): Promise<Player> => {
+  try {
+    // Check if username already exists
+    const existingPlayer = await db.select()
+      .from(playersTable)
+      .where(eq(playersTable.username, input.username))
+      .execute();
+
+    if (existingPlayer.length > 0) {
+      throw new Error('Username already exists');
+    }
+
+    // Generate unique player ID
+    const playerId = randomUUID();
+
+    // Insert player record
+    const result = await db.insert(playersTable)
+      .values({
+        id: playerId,
+        username: input.username
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Player creation failed:', error);
+    throw error;
+  }
+};
